@@ -142,3 +142,9 @@ footer { padding: 36px 24px 56px; color: var(--muted); font-size: 14px; } footer
 }
 @media print { .top, .dots, .dots-m, .progress { display: none; } .rv { opacity: 1; transform: none; } section { padding: 40px 0; } }
 .cbody .chip { align-self: flex-start; }
+
+/* рубли рядом с ценой в долларах, скидка SEO-ведения */
+.pack .price .rub { display: block; margin-top: 4px; font-size: 16px; line-height: 24px; color: var(--muted, #9aa3b5); font-weight: 500; }
+.pack .price .old { font-size: 20px; color: var(--muted, #9aa3b5); margin-right: 4px; }
+.pack .perk { margin: 0 0 16px; font-size: 14px; line-height: 20px; color: var(--muted, #9aa3b5); }
+.note.bonus { margin: 16px 0 24px; }

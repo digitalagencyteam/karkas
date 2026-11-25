@@ -4,8 +4,25 @@ import html, os
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out")
 
+FX = 82  # ₽ за $, курс ЦБ около 82
+
+def _g(n):
+    return f"{n:,}".replace(",", "\u00a0")
+
+def usd(n):
+    return "$" + _g(n)
+
+def rr(n):
+    """Рубли по курсу, округлённые: до тысяч от 10 000 ₽, иначе до сотен."""
+    v = n * FX
+    return _g(int(round(v, -3) if v >= 10000 else round(v, -2))) + "\u00a0₽"
+
 def rub(n):
-    return "$" + f"{n:,}".replace(",", "\u00a0")
+    return f"{usd(n)} / {rr(n)}"
+
+def rng(lo, hi):
+    a, b = rr(lo).replace("\u00a0₽", ""), rr(hi)
+    return f"{usd(lo)}–{_g(hi)} / {a}–{b}"
 
 # ------------------------------------------------------------------ ЦЕНЫ
 RATE = 37  # $/час, часть 1 (предположение; 3 000 ₽/ч по курсу ЦБ около 82 ₽/$)
@@ -37,7 +54,8 @@ P3_PACKS = [
     ("Редизайн", "5–6 недель", 2300, ["Главная, 3 страницы услуг, о Максиме, контакты", "Шаблоны статьи и кейса", "Адаптив, UI-kit, прототип в Figma", "Передача макетов для вёрстки"], True),
     ("Бренд + редизайн", "7–8 недель", 3750, ["Всё из «Редизайн»", "Платформа бренда и тон голоса", "Знак и логотип, палитра, шрифты, графический язык", "Мини-брендбук"], False),
 ]
-P3_DEV = "Вёрстка по утверждённым макетам оценивается отдельно по ставке части 1. Ориентир: $1 200–1 950."
+P3_DEV = "Вёрстка по утверждённым макетам оценивается отдельно по ставке части 1. Ориентир: $1 200–1 950 / 98 000–160 000 ₽."
+SEO_FULL = 1000  # обычная цена SEO-ведения, как на сайте LIVSKY
 
 PICK1, PICK2, PICK3 = 1950, 2050, 2300
 BUNDLE = PICK1 + PICK2 + PICK3
@@ -86,7 +104,7 @@ CASES = [
     ("seo-fintech", "SEO", "Финтех-сервис", "Страницы поднялись в Google за шесть недель", "32 из 53", "страниц блога и каталога поднялись в выдаче; средняя позиция страницы про привязку карты 38,5 → 10,4", "Проект нашего SEO-руководителя до запуска LIVSKY. Рост общего трафика включает поиск по названию сервиса, поэтому в цифрах берём только страницы."),
     ("specialist-sites", "Сайт + SEO", "Сайты частного специалиста", "Два сайта на двух языках, своя онлайн-запись и первая страница Google", "9,3", "средняя позиция в Google за два месяца", ""),
     ("atb", "Аудит", "ATB Groupe, Франция", "Аудит сайта по тому же формату, что и это предложение", "10", "предложений роста без редизайна и 30 тем статей", "Внедрение идёт, результаты ждём по мере правок."),
-    ("abmc", "Аудит → SEO → редизайн", "ABMC, Франция", "Полгода работы: аудит, SEO и редизайн по этапам", "6 мес", "техника, SEO и поэтапный редизайн с утверждением каждого шага", "Работа идёт: аудит и план готовы."),
+    ("abmc", "Аудит → SEO → редизайн", "ABMC, Франция", "План на полгода: аудит, SEO и редизайн по этапам", "6 мес", "техника, SEO и поэтапный редизайн с утверждением каждого шага", "Работа идёт: аудит и план готовы."),
     ("livsky-brand", "Брендинг", "Бренд LIVSKY", "От колеса архетипов до маскота и сайта в фирменном стиле", "5", "концепций маскота до финального", ""),
     ("design-glance", "Брендинг", "GLANCE", "Логотип-планета с глазом, маскот в 7 позах и бирки для одежды", "7", "поз маскота, бирки и упаковка", ""),
 ]
@@ -108,7 +126,12 @@ def packs_html(packs, unit=""):
     for name, term, price, items, rec in packs:
         lis = "".join(f"<li>{e(i)}</li>" for i in items)
         badge = '<span class="badge">Рекомендуем</span>' if rec else ""
-        out.append(f'<article class="pack dark rv{" rec" if rec else ""}">{badge}<h4>{e(name)}</h4><p class="term">{e(term)}</p><p class="price"><b>{rub(price)}</b>{unit if name=="Ведение" else ""}</p><ul>{lis}</ul></article>')
+        old, extra = "", ""
+        if name == "Ведение":
+            badge = '<span class="badge">Цена первых клиентов</span>'
+            old = f'<s class="old">{usd(SEO_FULL)}</s> '
+            extra = f'<p class="perk">Обычная цена {usd(SEO_FULL)} в месяц. Для первых клиентов LIVSKY {usd(price)}, взамен просим отзыв и разрешение показать работу в кейсах.</p>'
+        out.append(f'<article class="pack dark rv{" rec" if rec else ""}">{badge}<h4>{e(name)}</h4><p class="term">{e(term)}</p><p class="price">{old}<b>{usd(price)}</b>{unit if name=="Ведение" else ""}<span class="rub">{rr(price)}{unit if name=="Ведение" else ""}</span></p>{extra}<ul>{lis}</ul></article>')
     return '<div class="packs">' + "".join(out) + "</div>"
 
 def find_html():
@@ -121,8 +144,8 @@ def find_html():
     return "".join(out)
 
 def scope_html():
-    rows = "".join(f"<tr><td><b>{e(a)}</b></td><td>{e(b)}</td><td class='num'>{lo}–{hi}</td><td class='num'>{rub(lo*RATE)}–{rub(hi*RATE)}</td></tr>" for a, b, lo, hi in P1_SCOPE)
-    return f'<div class="tablewrap rv"><table><thead><tr><th>Блок работ</th><th>Что входит</th><th>Часы</th><th>Цена</th></tr></thead><tbody>{rows}<tr class="sum"><td colspan="2"><b>Итого, если брать всё</b></td><td class="num"><b>{h_min}–{h_max}</b></td><td class="num"><b>{rub(h_min*RATE)}–{rub(h_max*RATE)}</b></td></tr></tbody></table></div>'
+    rows = "".join(f"<tr><td><b>{e(a)}</b></td><td>{e(b)}</td><td class='num'>{lo}–{hi}</td><td class='num'>{rng(lo*RATE, hi*RATE)}</td></tr>" for a, b, lo, hi in P1_SCOPE)
+    return f'<div class="tablewrap rv"><table><thead><tr><th>Блок работ</th><th>Что входит</th><th>Часы</th><th>Цена</th></tr></thead><tbody>{rows}<tr class="sum"><td colspan="2"><b>Итого, если брать всё</b></td><td class="num"><b>{h_min}–{h_max}</b></td><td class="num"><b>{rng(h_min*RATE, h_max*RATE)}</b></td></tr></tbody></table></div>'
 
 def cases_html():
     out = []
@@ -200,7 +223,7 @@ def build():
       <article class="card dark rv d1"><span class="num">02</span><h3>SEO и GEO</h3><p>Страницы под запросы клиентов, доверие, видимость в Яндексе, Google и ответах нейросетей.</p><p class="from">от <b>{rub(P2_PACKS[0][2])}</b></p><a href="#part2">Подробнее</a></article>
       <article class="card dark rv d2"><span class="num">03</span><h3>Редизайн и брендинг</h3><p>Новый визуальный язык, блок доверия, макеты ключевых страниц.</p><p class="from">от <b>{rub(P3_PACKS[0][2])}</b></p><a href="#part3">Подробнее</a></article>
     </div>
-    <div class="bundle dark rv"><div><span class="chip">Комплекс</span><h3>Все три части вместе: {rub(TOTAL)}</h3><p>Рекомендуемые пакеты ({rub(PICK1)} + {rub(PICK2)} + {rub(PICK3)} = {rub(BUNDLE)}) со скидкой 10% за комплекс. Подробный расчёт в разделе «Цена».</p></div><a class="btn" href="#price">К ценам</a></div>
+    <div class="bundle dark rv"><div><span class="chip">Комплекс</span><h3>Все три части вместе: {rub(TOTAL)}</h3><p>Рекомендуемые пакеты трёх частей на {rub(BUNDLE)} со скидкой 10% за комплекс. Подробный расчёт в разделе «Цена».</p></div><a class="btn" href="#price">К ценам</a></div>
   </div>
 </section>
 
@@ -208,7 +231,7 @@ def build():
   <div class="wrap">
     <span class="tag rv">Часть 1</span>
     <h2 class="rv">Анализ и улучшение сайта</h2>
-    <p class="lead rv">Сайт работает, но проигрывает в мелочах, которые стоят заявок и репутации. Ниже 17 находок с доказательствами из ваших замеров, кода страницы и трёх юридических страниц сайта.</p>
+    <p class="lead rv">Сайт работает, но проигрывает в мелочах, которые стоят заявок и репутации. Ниже 17 находок с доказательствами из наших замеров, кода страницы и трёх юридических страниц сайта.</p>
 
     <h3 class="sh rv">Что у сайта уже хорошо</h3>
     <div class="g3">
@@ -224,7 +247,6 @@ def build():
       <tr><td>Lighthouse Accessibility</td><td class="num">89</td><td>Не хватает label у полей, есть проблемы с вкладками</td></tr>
       <tr><td>Lighthouse Best Practices</td><td class="num">77</td><td>Причины по скриншоту не видны, уточним при старте</td></tr>
       <tr><td>Вес страницы</td><td class="num">511 кБ, 851 кБ ресурсов</td><td>До 54% веса занимают шрифты Google</td></tr>
-      <tr><td>Время 15,35 с</td><td class="num">не время загрузки</td><td>Так выглядит шкала Network при открытой вкладке; на скорость страницы не указывает</td></tr>
       <tr><td>Ошибки валидатора</td><td class="num">12</td><td>Часть видна на скриншоте, остальные снимем при старте</td></tr>
     </tbody></table></div>
 
@@ -232,11 +254,11 @@ def build():
     <div class="fgroups">{find_html()}</div>
 
     <h3 class="sh rv">Доказательства</h3>
-    <p class="note2 rv">Скриншоты ваших замеров. Условия: расширение включено, кэш отключён. Поэтому мы сравниваем «до» и «после» в одинаковых условиях, а не обещаем конкретные баллы.</p>
+    <p class="note2 rv">Скриншоты наших замеров вашего сайта. Условия: расширение включено, кэш отключён. Поэтому мы сравниваем «до» и «после» в одинаковых условиях, а не обещаем конкретные баллы.</p>
     {proofs_html()}
 
     <h3 class="sh rv">Состав работ</h3>
-    <p class="note2 rv">Ставка {rub(RATE)} в час (около 3 000 ₽ по курсу ЦБ). Часы указаны вилкой, потому что код форм и скриптов анимации мы пока не видели.</p>
+    <p class="note2 rv">Ставка {rub(RATE)} в час. Рубли везде по курсу ЦБ около {FX} ₽ за $, оплата по курсу на день счёта. Часы указаны вилкой, потому что код форм и скриптов анимации мы пока не видели.</p>
     {scope_html()}
 
     <h3 class="sh rv">Три пакета</h3>
@@ -299,7 +321,8 @@ def build():
 
     <h3 class="sh rv">Цена</h3>
     {packs_html(P2_PACKS, " / мес")}
-    <p class="note2 rv">Расходы клиента отдельно: Ahrefs от $129 в месяц и Топвизор около $30 в месяц. Платные размещения на площадках по согласованию.</p>
+    <div class="note bonus dark rv"><b>Бонус: старт без раскачки</b>По итогам аудита у нас уже готовы ТЗ на хаб «Подбор персонала», страницы РОПа и построения отдела продаж, карта перелинковки 10 статей и черновик разметки. Передаём их в первый день «Запуска», поэтому первые страницы выходят на второй неделе, а не в конце месяца.</div>
+    <p class="note2 rv">Расходы клиента отдельно: Ahrefs от $129 в месяц и Топвизор около 2 500 ₽ в месяц. Платные размещения на площадках по согласованию.</p>
     <p class="note2 rv">Чего мы не проверяли: реальные позиции, запросы, показы и заявки (нужны доступы к Метрике, Вебмастеру и Search Console), ответы ChatGPT, Perplexity, Алисы и GigaChat напрямую. Формы не отправляли, чтобы не создавать ложных заявок.</p>
   </div>
 </section>
@@ -363,7 +386,7 @@ def build():
       <tr class="sum"><td colspan="3"><b>Итого комплекс</b></td><td class="num"><b>{rub(TOTAL)}</b></td></tr>
     </tbody></table></div>
     <div class="g2">
-      <div class="note dark rv"><b>Дальше</b>SEO-ведение {rub(P2_PACKS[2][2])} в месяц со второго месяца. Вёрстка макетов части 3 оценивается после утверждения (ориентир $1 200–1 950).</div>
+      <div class="note dark rv"><b>Дальше</b>SEO-ведение {rub(P2_PACKS[2][2])} в месяц со второго месяца, это цена первых клиентов вместо {usd(SEO_FULL)}. Вёрстка макетов части 3 оценивается после утверждения (ориентир $1 200–1 950 / 98 000–160 000 ₽).</div>
       <div class="note dark rv d1"><b>Условия</b>Смету и сроки фиксируем в договоре до старта. До 5 правок на каждом этапе входят в цену. Цены «от», итог считаем после брифа.</div>
     </div>
   </div>
@@ -387,14 +410,14 @@ def build():
 <section id="team">
   <div class="wrap">
     <span class="tag rv">Кто делает</span>
-    <h2 class="rv">Маленькая, но <span class="acc">сильная команда</span></h2>
-    <p class="lead rv">Мы мыслим очень просто и без бюрократии в общении.</p>
+    <h2 class="rv">У каждой части <span class="acc">свой ответственный</span></h2>
+    <p class="lead rv">Все вопросы решаем в одном чате, без лишних созвонов.</p>
     <div class="g3">
-      <article class="card dark rv"><img class="mini" src="img/mascot/walk.svg" alt="" width="60" height="83"><h3>Сайт</h3><p>София, основательница: программистка и SEO с маркетинговым опытом.</p></article>
-      <article class="card dark rv d1"><img class="mini" src="img/mascot/sneak.svg" alt="" width="80" height="84"><h3>SEO и GEO</h3><p>SEO-руководитель LIVSKY. Проекты в финтехе, 200+ публикаций на внешних площадках.</p></article>
-      <article class="card dark rv d2"><img class="mini" src="img/mascot/shrug.svg" alt="" width="100" height="73"><h3>Дизайн и бренд</h3><p>Лид дизайна LIVSKY: брендинг, маскоты, веб-дизайн и моушн.</p></article>
+      <article class="card dark rv"><img class="mini" src="img/mascot/walk.svg" alt="" width="60" height="83"><h3>Сайт</h3><p>София, сооснователь LIVSKY, лидер отдела разработки.</p></article>
+      <article class="card dark rv d1"><img class="mini" src="img/mascot/sneak.svg" alt="" width="80" height="84"><h3>SEO и GEO</h3><p>Антон, сооснователь LIVSKY, лидер отдела SEO и GEO. Проекты в финтехе, 200+ публикаций на внешних площадках.</p></article>
+      <article class="card dark rv d2"><img class="mini" src="img/mascot/shrug.svg" alt="" width="100" height="73"><h3>Дизайн и бренд</h3><p>Альбина, лидер отдела дизайна: брендинг, маскоты, веб-дизайн и моушн.</p></article>
     </div>
-    <div class="cta dark rv"><div><h3>Обсудим?</h3><p>Ответим в течение дня. Напишите, какую часть берёте, и мы согласуем смету.</p></div><div class="cta-links"><a class="btn" href="mailto:hello@livsky.ru">hello@livsky.ru</a></div></div>
+    <div class="cta dark rv"><div><h3>Обсудим?</h3><p>Ответим в течение дня. Напишите в наш общий чат, какую часть берёте, и мы согласуем смету.</p></div></div>
   </div>
 </section>
 
